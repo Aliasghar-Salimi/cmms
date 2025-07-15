@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+*.suo
+*.db
+*.mdf
+.vscode/
+.git/
+.gitignore
+Dockerfile
+docker-compose*

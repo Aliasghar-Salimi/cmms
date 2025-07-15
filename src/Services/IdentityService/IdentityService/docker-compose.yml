@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Ali@1234
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - cmms-network
+
+  identity-service:
+    image: cmms-identity-service:latest
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=CMMSIdentityService;User=sa;Password=Ali@1234;TrustServerCertificate=True
+    depends_on:
+      - sqlserver
+    networks:
+      - cmms-network
+
+volumes:
+  sqlserver_data:
+
+networks:
+  cmms-network:
+    driver: bridge 
