@@ -11,6 +11,9 @@ public class IdentityServiceDbContext : IdentityDbContext<ApplicationUser, Appli
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<SmsVerificationCode> SmsVerificationCodes { get; set; }
+    public DbSet<UserMfa> UserMfas { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -67,6 +70,40 @@ public class IdentityServiceDbContext : IdentityDbContext<ApplicationUser, Appli
         builder.Entity<RefreshToken>().Property(rt => rt.IsExpired).IsRequired().HasDefaultValue(false);
         builder.Entity<RefreshToken>().Property(rt => rt.IsRevoked).IsRequired().HasDefaultValue(false);
         builder.Entity<RefreshToken>().HasOne(rt => rt.User).WithMany().HasForeignKey(rt => rt.UserId).OnDelete(DeleteBehavior.Cascade);
+
+        // SmsVerificationCode configuration
+        builder.Entity<SmsVerificationCode>().HasKey(svc => svc.Id);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.Id).ValueGeneratedOnAdd().IsRequired();
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.PhoneNumber).IsRequired().HasMaxLength(20);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.Code).IsRequired().HasMaxLength(10);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.Purpose).IsRequired().HasMaxLength(50);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.CreatedAt).IsRequired().HasDefaultValueSql("GETDATE()").ValueGeneratedOnAdd();
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.ExpiresAt).IsRequired();
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.IsUsed).IsRequired().HasDefaultValue(false);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.UsedAt);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.UsedByIp).HasMaxLength(50);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.Attempts).IsRequired().HasDefaultValue(0);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.MaxAttempts).IsRequired().HasDefaultValue(3);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Entity<SmsVerificationCode>().HasOne(svc => svc.User).WithMany().HasForeignKey(svc => svc.UserId).OnDelete(DeleteBehavior.SetNull);
+
+        // UserMfa configuration
+        builder.Entity<UserMfa>().HasKey(um => um.Id);
+        builder.Entity<UserMfa>().Property(um => um.Id).ValueGeneratedOnAdd().IsRequired();
+        builder.Entity<UserMfa>().Property(um => um.UserId).IsRequired();
+        builder.Entity<UserMfa>().Property(um => um.IsEnabled).IsRequired().HasDefaultValue(false);
+        builder.Entity<UserMfa>().Property(um => um.MfaType).IsRequired().HasMaxLength(20).HasDefaultValue("sms");
+        builder.Entity<UserMfa>().Property(um => um.BackupPhoneNumber).HasMaxLength(20);
+        builder.Entity<UserMfa>().Property(um => um.BackupEmail).HasMaxLength(256);
+        builder.Entity<UserMfa>().Property(um => um.LastUsedAt);
+        builder.Entity<UserMfa>().Property(um => um.CreatedAt).IsRequired().HasDefaultValueSql("GETDATE()").ValueGeneratedOnAdd();
+        builder.Entity<UserMfa>().Property(um => um.UpdatedAt).IsRequired().HasDefaultValueSql("GETDATE()").ValueGeneratedOnAddOrUpdate();
+        builder.Entity<UserMfa>().Property(um => um.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Entity<UserMfa>().Property(um => um.TotpSecret).HasMaxLength(100);
+        builder.Entity<UserMfa>().Property(um => um.TotpEnabled).IsRequired().HasDefaultValue(false);
+        builder.Entity<UserMfa>().Property(um => um.BackupCodes).HasMaxLength(1000);
+        builder.Entity<UserMfa>().Property(um => um.BackupCodesRemaining).IsRequired().HasDefaultValue(0);
+        builder.Entity<UserMfa>().HasOne(um => um.User).WithMany().HasForeignKey(um => um.UserId).OnDelete(DeleteBehavior.Cascade);
 
         // AuditLog configuration
         // builder.Entity<AuditLog>().HasKey(al => al.Id);

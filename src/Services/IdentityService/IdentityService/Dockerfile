@@ -2,12 +2,22 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy everything and restore
-COPY . ./
-RUN dotnet restore
+# Set environment variables for better NuGet performance
+ENV NUGET_XMLDOC_MODE=skip
+ENV DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0
+ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 
-# Build and publish
-RUN dotnet publish -c Release -o /app/publish
+# Copy csproj first for better layer caching
+COPY *.csproj ./
+
+# Restore with retry and timeout settings
+RUN dotnet restore 
+
+# Copy everything else
+COPY . ./
+
+# Build and publish with optimized settings
+RUN dotnet publish -c Release -o /app/publish --no-restore --verbosity minimal
 
 # Step 2: Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime

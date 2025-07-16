@@ -7,5 +7,14 @@ obj/
 .vscode/
 .git/
 .gitignore
-Dockerfile
+Dockerfile*
 docker-compose*
+README.md
+build.sh
+*.log
+*.tmp
+*.cache
+node_modules/
+.env
+.env.local
+.env.production

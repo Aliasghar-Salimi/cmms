@@ -1,0 +1,56 @@
+### MFA Login Flow Test
+
+### Step 1: Login with MFA Required
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin123!",
+  "tenantId": "{{tenantId}}"
+}
+
+### Step 2: Complete MFA Login (if MFA is required)
+POST {{baseUrl}}/api/v1/auth/mfa-login
+Content-Type: application/json
+
+{
+  "mfaToken": "{{mfaToken}}",
+  "verificationCode": "{{otpCode}}"
+}
+
+### Step 3: Enable MFA for a User
+POST {{baseUrl}}/api/v1/auth/enable-mfa
+Content-Type: application/json
+
+{
+  "phoneNumber": "09123456789",
+  "mfaType": "sms",
+  "backupPhoneNumber": "09123456788",
+  "backupEmail": "backup@example.com"
+}
+
+### Step 4: Verify MFA Setup
+POST {{baseUrl}}/api/v1/auth/verify-mfa
+Content-Type: application/json
+
+{
+  "phoneNumber": "09123456789",
+  "verificationCode": "{{otpCode}}",
+  "purpose": "mfa-setup"
+}
+
+### Step 5: Resend OTP
+POST {{baseUrl}}/api/v1/auth/resend-otp
+Content-Type: application/json
+
+{
+  "phoneNumber": "09123456789",
+  "purpose": "mfa-login"
+}
+
+### Variables (set these in your environment)
+# @baseUrl = https://localhost:7001
+# @tenantId = your-tenant-id
+# @mfaToken = mfa-session-token-from-login-response
+# @otpCode = 6-digit-code-from-sms 
