@@ -6,7 +6,7 @@ using IdentityService.Application.Features.Users.Commands.UpdateUser;
 using IdentityService.Application.Features.Users.Commands.DeleteUser;
 using IdentityService.Application.Features.Users.Quesries.GetUserById;
 using IdentityService.Application.Features.Users.Quesries.GetUsers;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Users.DTOs;
 
 namespace IdentityService.Controllers;
 
@@ -81,7 +81,11 @@ public class UsersController : ControllerBase
             }
             return BadRequest(result);
         }
-
+        // GUIDANGE: CreatedAtAction is an ASP.NET Core helper method that returns a 201 Created response. Syntactically, it:
+        // Specifies the action name (GetUserById) to generate a Location header for the new resource.
+        // Passes route values (new { id = result.Data!.Id }) to build the URL.
+        // Returns the created resource (result.Data) in the response body.
+        // This line tells clients where to find the newly created user.
         return CreatedAtAction(nameof(GetUserById), new { id = result.Data!.Id }, result.Data);
     }
 

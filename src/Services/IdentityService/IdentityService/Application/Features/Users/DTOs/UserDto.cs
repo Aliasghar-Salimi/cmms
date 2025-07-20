@@ -32,6 +32,11 @@ public class UserDto
     public DateTime CreatedAt { get; set; }
     
     public DateTime? UpdatedAt { get; set; }
+    public bool EmailConfirmed { get; set; }
+    public bool PhoneNumberConfirmed { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public bool LockoutEnabled { get; set; }
+    public List<Guid> RoleIds { get; set; } = new();
 }
 
 public class CreateUserDto
@@ -82,6 +87,12 @@ public class UpdateUserDto
     public string? PhoneNumber { get; set; }
     
     public List<string> RoleNames { get; set; } = new();
+    public bool EmailConfirmed { get; set; }
+    public bool PhoneNumberConfirmed { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public bool LockoutEnabled { get; set; }
+    public bool IsActive { get; set; }
+    public List<Guid> RoleIds { get; set; } = new();
 }
 
 public class UserListDto
@@ -106,4 +117,13 @@ public class UserFilterDto
     public int PageSize { get; set; } = 10;
     public string? SortBy { get; set; } = "UserName";
     public bool SortDescending { get; set; } = false;
+} 
+
+public class UserListResultDto
+{
+    public List<UserListDto> Users { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int PageNumber { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages { get; set; }
 } 

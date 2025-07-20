@@ -18,7 +18,6 @@ namespace IdentityService.Application.Features.Auth.Commands.Login;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLoginResponseDto>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IdentityServiceDbContext _context;
     private readonly IMapper _mapper;
     private readonly IConfiguration _configuration;
@@ -26,14 +25,12 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
 
     public LoginCommandHandler(
         UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
         IdentityServiceDbContext context,
         IMapper mapper,
         IConfiguration configuration,
         ISmsVerificationService smsVerificationService)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
         _context = context;
         _mapper = mapper;
         _configuration = configuration;
@@ -61,9 +58,9 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
             return Result<MfaLoginResponseDto>.Failure("User does not belong to the specified tenant.");
         }
 
-        // Attempt to sign in
-        var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
-        if (!signInResult.Succeeded)
+        // Validate password
+        var isPasswordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+        if (!isPasswordValid)
         {
             return Result<MfaLoginResponseDto>.Failure("Invalid email or password.");
         }

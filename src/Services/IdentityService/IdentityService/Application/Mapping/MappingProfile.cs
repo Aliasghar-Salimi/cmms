@@ -13,9 +13,13 @@ public class MappingProfile : Profile
     {
         // User mappings
         CreateMap<ApplicationUser, UserDto>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
+            .ForMember(dest => dest.TenantId, opt => opt.MapFrom(src => src.TenantId.ToString()))
             .ForMember(dest => dest.Roles, opt => opt.Ignore()); // Roles will be loaded separately
 
-        CreateMap<ApplicationUser, UserListDto>();
+        CreateMap<ApplicationUser, UserListDto>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
+            .ForMember(dest => dest.TenantId, opt => opt.MapFrom(src => src.TenantId.ToString()));
 
         CreateMap<CreateUserDto, ApplicationUser>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
@@ -26,7 +30,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.TwoFactorEnabled, opt => opt.Ignore())
             .ForMember(dest => dest.LockoutEnd, opt => opt.Ignore())
             .ForMember(dest => dest.LockoutEnabled, opt => opt.Ignore())
-            .ForMember(dest => dest.AccessFailedCount, opt => opt.Ignore());
+            .ForMember(dest => dest.AccessFailedCount, opt => opt.Ignore())
+            .ForMember(dest => dest.TenantId, opt => opt.MapFrom(src => !string.IsNullOrEmpty(src.TenantId) ? Guid.Parse(src.TenantId) : Guid.Empty));
 
         CreateMap<UpdateUserDto, ApplicationUser>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
@@ -40,21 +45,26 @@ public class MappingProfile : Profile
 
         // Tenant mappings
         CreateMap<Tenant, TenantDto>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id.ToString()))
+            .ForMember(dest => dest.UserCount, opt => opt.MapFrom(src => src.Users != null ? src.Users.Count : 0))
+            .ForMember(dest => dest.RoleCount, opt => opt.MapFrom(src => src.Roles != null ? src.Roles.Count : 0))
             .ForMember(dest => dest.Users, opt => opt.Ignore()) // Users will be loaded separately
             .ForMember(dest => dest.Roles, opt => opt.Ignore()); // Roles will be loaded separately
 
-        CreateMap<Tenant, TenantListDto>();
+
 
         CreateMap<CreateTenantDto, Tenant>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Users, opt => opt.Ignore())
-            .ForMember(dest => dest.Roles, opt => opt.Ignore());
+            .ForMember(dest => dest.Roles, opt => opt.Ignore())
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => true));
 
         CreateMap<UpdateTenantDto, Tenant>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Users, opt => opt.Ignore())
             .ForMember(dest => dest.Roles, opt => opt.Ignore());
 

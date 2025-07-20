@@ -250,13 +250,29 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 401)]
     public async Task<IActionResult> GetCurrentUser()
     {
-        var result = await _mediator.Send(new GetCurrentUserQuery());
-        
-        if (!result.IsSuccess)
+        try
         {
-            return Unauthorized(new { error = result.Error });
-        }
+            var result = await _mediator.Send(new GetCurrentUserQuery());
+            
+            if (!result.IsSuccess)
+            {
+                return Unauthorized(new { 
+                    error = result.Error,
+                    message = "Authentication failed",
+                    statusCode = 401
+                });
+            }
 
-        return Ok(result.Data);
+            return Ok(result.Data);
+        }
+        catch (Exception ex)
+        {
+            return Unauthorized(new { 
+                error = "Authentication failed",
+                message = "Invalid or expired token",
+                statusCode = 401,
+                details = ex.Message
+            });
+        }
     }
 } 

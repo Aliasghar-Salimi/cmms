@@ -1,5 +1,5 @@
 using MediatR;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Tenants.DTOs;
 using IdentityService.Application.Common;
 
 namespace IdentityService.Application.Features.Tenants.Queries.GetTenantById;

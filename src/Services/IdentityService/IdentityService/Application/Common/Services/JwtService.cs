@@ -54,7 +54,7 @@ public class JwtService : IJwtService
 
         var token = new JwtSecurityToken(
             issuer: _configuration["Jwt:Issuer"] ?? "CMMS.IdentityService",
-            audience: _configuration["Jwt:Audience"] ?? "CMMS.Client",
+            audience: _configuration["Jwt:Audience"] ?? "CMMS.Users",
             claims: claims,
             notBefore: DateTime.UtcNow,
             expires: DateTime.UtcNow.AddHours(1),
@@ -76,7 +76,7 @@ public class JwtService : IJwtService
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = _configuration["Jwt:Issuer"] ?? "CMMS.IdentityService",
-                ValidAudience = _configuration["Jwt:Audience"] ?? "CMMS.Client",
+                ValidAudience = _configuration["Jwt:Audience"] ?? "CMMS.Users",
                 IssuerSigningKey = _key,
                 ClockSkew = TimeSpan.Zero // No clock skew for strict validation
             };

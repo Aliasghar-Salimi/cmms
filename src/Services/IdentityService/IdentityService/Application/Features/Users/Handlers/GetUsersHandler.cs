@@ -2,14 +2,14 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Users.DTOs;
 using IdentityService.Application.Features.Users.Quesries.GetUsers;
 using IdentityService.Application.Common;
 using IdentityService.Domain.Entities;
 
 namespace IdentityService.Application.Features.Users.Handlers;
 
-public class GetUsersHandler : IRequestHandler<GetUsersQuery, Result<UserListDto>>
+public class GetUsersHandler : IRequestHandler<GetUsersQuery, Result<UserListResultDto>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IMapper _mapper;
@@ -20,7 +20,7 @@ public class GetUsersHandler : IRequestHandler<GetUsersQuery, Result<UserListDto
         _mapper = mapper;
     }
 
-    public async Task<Result<UserListDto>> Handle(GetUsersQuery request, CancellationToken cancellationToken)
+    public async Task<Result<UserListResultDto>> Handle(GetUsersQuery request, CancellationToken cancellationToken)
     {
         try
         {
@@ -74,9 +74,9 @@ public class GetUsersHandler : IRequestHandler<GetUsersQuery, Result<UserListDto
                 .Take(request.PageSize)
                 .ToListAsync(cancellationToken);
 
-            var userDtos = _mapper.Map<List<UserDto>>(users);
+            var userDtos = _mapper.Map<List<UserListDto>>(users);
 
-            var result = new UserListDto
+            var result = new UserListResultDto
             {
                 Users = userDtos,
                 TotalCount = totalCount,
@@ -85,11 +85,11 @@ public class GetUsersHandler : IRequestHandler<GetUsersQuery, Result<UserListDto
                 TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
             };
 
-            return Result<UserListDto>.Success(result);
+            return Result<UserListResultDto>.Success(result);
         }
         catch (Exception ex)
         {
-            return Result<UserListDto>.Failure($"An error occurred while retrieving users: {ex.Message}");
+            return Result<UserListResultDto>.Failure($"An error occurred while retrieving users: {ex.Message}");
         }
     }
 } 

@@ -6,7 +6,7 @@ using IdentityService.Application.Features.Tenants.Commands.UpdateTenant;
 using IdentityService.Application.Features.Tenants.Commands.DeleteTenant;
 using IdentityService.Application.Features.Tenants.Queries.GetTenantById;
 using IdentityService.Application.Features.Tenants.Queries.GetTenants;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Tenants.DTOs;
 
 namespace IdentityService.Controllers;
 
@@ -16,6 +16,7 @@ namespace IdentityService.Controllers;
 [Authorize]
 public class TenantsController : ControllerBase
 {
+    // GUIDANCE: dependency injection, mediator parameter is in the constructor and _mediator is the field
     private readonly IMediator _mediator;
 
     public TenantsController(IMediator mediator)
@@ -26,6 +27,7 @@ public class TenantsController : ControllerBase
     /// <summary>
     /// Get all tenants with filtering and pagination
     /// </summary>
+    // GUIDANCE: HttpGet is the method, [FromQuery] is the query parameter, ProducesResponseType is the response type, 200 is the status code, 400 is the bad request, 401 is the unauthorized
     [HttpGet]
     [ProducesResponseType(typeof(List<TenantDto>), 200)]
     [ProducesResponseType(typeof(ProblemDetails), 400)]

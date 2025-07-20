@@ -1,7 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Tenants.DTOs;
 using IdentityService.Application.Features.Tenants.Queries.GetTenants;
 using IdentityService.Application.Common;
 using IdentityService.Infrastructure.Persistence;

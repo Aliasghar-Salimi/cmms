@@ -2,7 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Users.DTOs;
 using IdentityService.Application.Features.Users.Quesries.GetUserById;
 using IdentityService.Application.Common;
 using IdentityService.Domain.Entities;

@@ -48,25 +48,24 @@ public class UpdateTenantDto
     
     [StringLength(500)]
     public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
 }
 
 public class TenantListDto
 {
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public bool IsActive { get; set; }
-    public int UserCount { get; set; }
-    public int RoleCount { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public List<TenantDto> Tenants { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int PageNumber { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages { get; set; }
 }
 
 public class TenantFilterDto
 {
     public string? SearchTerm { get; set; }
     public bool? IsActive { get; set; }
-    public int Page { get; set; } = 1;
+    public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 10;
-    public string? SortBy { get; set; } = "Name";
+    public string SortBy { get; set; } = "Name";
     public bool SortDescending { get; set; } = false;
 } 

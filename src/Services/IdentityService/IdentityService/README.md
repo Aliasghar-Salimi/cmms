@@ -22,6 +22,8 @@ A professional Identity and Access Management Service for the CMMS Platform, bui
 - **Role-Based Access Control (RBAC)**: Comprehensive permission system
 - **Permission Management**: Auto-generation and manual permission management
 - **Current User Info**: JWT-based current user information retrieval
+- **Admin User Creation**: Database seeding and CLI command for creating admin users
+- **Default Tenant Setup**: Automatic creation of default tenant and admin role
 
 ### 🏗️ Architecture & Development
 - **Clean Architecture**: CQRS pattern with MediatR
@@ -45,6 +47,7 @@ A professional Identity and Access Management Service for the CMMS Platform, bui
 ## 📋 Table of Contents
 
 - [Quick Start](#quick-start)
+- [Admin User Setup](#admin-user-setup)
 - [Authentication Flow](#authentication-flow)
 - [API Documentation](#api-documentation)
 - [RBAC System](#rbac-system)
@@ -54,6 +57,7 @@ A professional Identity and Access Management Service for the CMMS Platform, bui
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 - [Development](#development)
+- [Database Seeding](#database-seeding)
 
 ## 🏃‍♂️ Quick Start
 
@@ -93,9 +97,49 @@ dotnet ef database update
 dotnet run
 
 # The service will be available at:
-# - API: https://localhost:7001
-# - Swagger: https://localhost:7001/swagger
+# - API: http://localhost:5226
+# - Swagger: http://localhost:5226/swagger
+# - Health: http://localhost:5226/health
 ```
+
+## 👤 Admin User Setup
+
+### Automatic Database Seeding
+
+The application automatically creates essential system entities on startup:
+
+1. **Default Tenant**: Creates a "Default" tenant for system operations
+2. **Admin Role**: Creates an "Admin" role with full system permissions
+3. **Admin User**: Creates a default admin user (admin@cmms.com)
+
+This seeding runs automatically when the application starts if these entities don't exist.
+
+### Manual Admin User Creation
+
+You can also manually create admin users using the CLI command:
+
+```bash
+# Create admin user via CLI command
+dotnet run -- CreateAdminUser
+
+# The command will prompt for:
+# - Username (default: admin)
+# - Email (default: admin@cmms.com)
+# - Password (default: Admin@123)
+```
+
+### Default Admin Credentials
+
+After seeding, you can log in with:
+- **Email**: admin@cmms.com
+- **Password**: Admin@123
+- **Role**: Admin (with full system permissions)
+
+### Customizing Admin Setup
+
+You can modify the default values in:
+- `Infrastructure/Persistence/DatabaseSeeder.cs` - For automatic seeding
+- `Commands/CreateAdminUser.cs` - For CLI command defaults
 
 ## 🔐 Authentication Flow
 
@@ -137,7 +181,7 @@ GET    /api/v1/auth/me                 # Get current user information
 
 ### Base URL
 - **Production**: `https://api.cmms-platform.com/api/v1`
-- **Development**: `https://localhost:7001/api/v1`
+- **Development**: `http://localhost:5226/api/v1`
 - **Docker**: `http://localhost:5000/api/v1`
 
 ### Authentication
@@ -300,23 +344,23 @@ POST /api/v1/auth/resend-otp         # Resend OTP for any purpose
 ### Clean Architecture
 ```
 IdentityService/
-├── Application/           # Application layer (CQRS, DTOs, Validators)
-│   ├── Common/           # Shared application concerns
-│   │   ├── Authorization/ # RBAC authorization handlers
-│   │   ├── Services/     # JWT, SMS, and other services
-│   │   └── ApiVersioning/ # API versioning configuration
-│   ├── Features/         # Feature-based organization
-│   │   ├── Auth/         # Authentication features
-│   │   ├── Users/        # User management features
-│   │   ├── Roles/        # Role management features
-│   │   ├── Permissions/  # Permission management features
-│   │   └── Tenants/      # Tenant management features
-│   └── Mapping/          # AutoMapper profiles
-├── Domain/               # Domain layer (Entities, Interfaces)
-│   └── Entities/         # Domain entities
-├── Infrastructure/       # Infrastructure layer (Database, External services)
-│   └── Persistence/      # Entity Framework configuration
-└── Controllers/          # API Controllers
+├── Application/                 # Application layer (CQRS, DTOs, Validators)
+│   ├── Common/                  # Shared application concerns
+│   │   ├── Authorization/       # RBAC authorization handlers
+│   │   ├── Services/            # JWT, SMS, and other services
+│   │   └── ApiVersioning/       # API versioning configuration
+│   ├── Features/                # Feature-based organization
+│   │   ├── Auth/                # Authentication features
+│   │   ├── Users/               # User management features
+│   │   ├── Roles/               # Role management features
+│   │   ├── Permissions/         # Permission management features
+│   │   └── Tenants/             # Tenant management features
+│   └── Mapping/                 # AutoMapper profiles
+├── Domain/                      # Domain layer (Entities, Interfaces)
+│   └── Entities/                # Domain entities
+├── Infrastructure/              # Infrastructure layer (Database, External services)
+│   └── Persistence/             # Entity Framework configuration
+└── Controllers/                 # API Controllers
 ```
 
 ### CQRS Pattern
@@ -408,6 +452,30 @@ docker run -d -p 5000:80 cmms-identity-service:latest
 - SQL Server (or Docker)
 - Kavenegar SMS API key (for SMS features)
 
+### Project Structure
+```
+IdentityService/
+├── Application/                 # Application layer (CQRS, DTOs, Validators)
+│   ├── Common/                  # Shared application concerns
+│   │   ├── Authorization/       # RBAC authorization handlers
+│   │   ├── Services/            # JWT, SMS, and other services
+│   │   └── ApiVersioning/       # API versioning configuration
+│   ├── Features/                # Feature-based organization
+│   │   ├── Auth/                # Authentication features
+│   │   ├── Users/               # User management features
+│   │   ├── Roles/               # Role management features
+│   │   ├── Permissions/         # Permission management features
+│   │   └── Tenants/             # Tenant management features
+│   └── Mapping/                 # AutoMapper profiles
+├── Domain/                      # Domain layer (Entities, Interfaces)
+│   └── Entities/                # Domain entities
+├── Infrastructure/              # Infrastructure layer (Database, External services)
+│   └── Persistence/             # Entity Framework configuration
+├── Controllers/                 # API Controllers
+├── Commands/                    # CLI commands (CreateAdminUser)
+└── Migrations/                  # Entity Framework migrations
+```
+
 ### Development Setup
 ```bash
 # Clone repository
@@ -422,7 +490,21 @@ dotnet ef database update
 
 # Start development server
 dotnet run
+
+# The service will be available at:
+# - API: http://localhost:5226/api/v1
+# - Swagger: http://localhost:5226/swagger
+# - Health: http://localhost:5226/health
 ```
+
+### Database Seeding
+
+The application includes automatic database seeding that creates:
+- **Default Tenant**: "Default" tenant for system operations
+- **Admin Role**: "Admin" role with full system permissions
+- **Admin User**: Default admin user (admin@cmms.com)
+
+This seeding runs automatically on application startup if the entities don't exist.
 
 ### Testing
 ```bash
@@ -508,6 +590,18 @@ dotnet ef migrations remove
 - ✅ Current user information endpoint
 - ✅ Enhanced documentation and testing support
 - ✅ Nullable reference types implementation
+- ✅ **Database seeding for admin user creation**
+- ✅ **CLI command for manual admin user creation**
+- ✅ **Automatic default tenant and role setup**
+- ✅ **Fixed DTO mapping and namespace consistency**
+- ✅ **Improved error handling and validation**
+
+### Recent Improvements (Latest Update)
+- 🔧 **Fixed Build Errors**: Resolved missing using directives for UserStore and RoleStore
+- 🔧 **DTO Consistency**: Unified DTO usage across features and removed duplicate mappings
+- 🔧 **Admin User Creation**: Added both automatic seeding and manual CLI command
+- 🔧 **Port Configuration**: Updated development port to 5226 for consistency
+- 🔧 **Documentation**: Enhanced README with new features and setup instructions
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history and changes.
 
@@ -532,6 +626,39 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Version Info**: `/api/v1/version` endpoint
 - **JWT Guide**: See `SWAGGER_JWT_GUIDE.md`
 - **Testing**: See `Swagger_JWT_Testing.http`
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Build Errors**
+```bash
+# If you get UserStore/RoleStore errors:
+# Add missing using directive in CreateAdminUser.cs:
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+```
+
+**Port Already in Use**
+```bash
+# Kill existing dotnet processes
+pkill -f dotnet
+
+# Or use a different port
+dotnet run --urls="http://localhost:5227"
+```
+
+**Database Connection Issues**
+```bash
+# Check connection string in appsettings.json
+# Ensure SQL Server is running
+# For Docker: docker-compose up -d
+```
+
+**Admin User Already Exists**
+```bash
+# This is normal - the seeding checks for existing users
+# You can still use the CLI command to create additional admin users
+```
 
 ## 🔗 Related Projects
 

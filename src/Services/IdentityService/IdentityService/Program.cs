@@ -75,8 +75,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddDbContext<IdentityServiceDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add Identity
-builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+// Add Identity without cookie authentication for API-only usage
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
@@ -85,6 +85,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
     options.Password.RequiredLength = 8;
     options.User.RequireUniqueEmail = true;
 })
+.AddRoles<ApplicationRole>()
 .AddEntityFrameworkStores<IdentityServiceDbContext>()
 .AddDefaultTokenProviders();
 
@@ -114,10 +115,30 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // Disabled for development
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Global exception handler for authentication errors
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        context.Response.StatusCode = 401;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            error = "Authentication failed",
+            message = "Invalid or expired token",
+            statusCode = 401
+        }));
+    }
+});
 
 app.MapControllers();
 
@@ -141,5 +162,8 @@ app.MapGet("/health", () => Results.Ok(new {
     Version = VersionInfo.InformationalVersion,
     BuildVersion = VersionInfo.Version
 }));
+
+// Seed database with initial data
+await DatabaseSeeder.SeedAsync(app.Services);
 
 app.Run();

@@ -1,10 +1,10 @@
 using MediatR;
-using IdentityService.Application.DTOs;
+using IdentityService.Application.Features.Users.DTOs;
 using IdentityService.Application.Common;
 
 namespace IdentityService.Application.Features.Users.Quesries.GetUsers;
 
-public class GetUsersQuery : IRequest<Result<UserListDto>>
+public class GetUsersQuery : IRequest<Result<UserListResultDto>>
 {
     public string? SearchTerm { get; set; }
     public Guid? TenantId { get; set; }
