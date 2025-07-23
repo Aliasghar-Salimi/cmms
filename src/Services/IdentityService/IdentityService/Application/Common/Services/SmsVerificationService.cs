@@ -35,6 +35,13 @@ public class SmsVerificationService : ISmsVerificationService
             var otp = GenerateOtp();
             var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
+            // Generate MFA token for MFA purposes
+            string? mfaToken = null;
+            if (purpose == "mfa-login")
+            {
+                mfaToken = Guid.NewGuid().ToString();
+            }
+
             // Create verification code record
             var verificationCode = new SmsVerificationCode
             {
@@ -43,6 +50,7 @@ public class SmsVerificationService : ISmsVerificationService
                 Purpose = purpose,
                 ExpiresAt = expiresAt,
                 UserId = userId,
+                MfaToken = mfaToken,
                 IsActive = true
             };
 
@@ -59,7 +67,9 @@ public class SmsVerificationService : ISmsVerificationService
             }
 
             _logger.LogInformation("OTP generated and sent successfully to {PhoneNumber} for purpose {Purpose}", phoneNumber, purpose);
-            return Result<string>.Success(otp);
+            
+            // Return MFA token for MFA purposes, otherwise return OTP
+            return Result<string>.Success(purpose == "mfa-login" ? mfaToken! : otp);
         }
         catch (Exception ex)
         {

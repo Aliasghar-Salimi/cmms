@@ -85,6 +85,7 @@ public class IdentityServiceDbContext : IdentityDbContext<ApplicationUser, Appli
         builder.Entity<SmsVerificationCode>().Property(svc => svc.Attempts).IsRequired().HasDefaultValue(0);
         builder.Entity<SmsVerificationCode>().Property(svc => svc.MaxAttempts).IsRequired().HasDefaultValue(3);
         builder.Entity<SmsVerificationCode>().Property(svc => svc.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Entity<SmsVerificationCode>().Property(svc => svc.MfaToken).HasMaxLength(255);
         builder.Entity<SmsVerificationCode>().HasOne(svc => svc.User).WithMany().HasForeignKey(svc => svc.UserId).OnDelete(DeleteBehavior.SetNull);
 
         // UserMfa configuration

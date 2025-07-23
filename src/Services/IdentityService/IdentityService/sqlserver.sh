@@ -3,8 +3,11 @@
 # SQL Server Container Management Script
 # Usage: ./sqlserver.sh [start|stop|restart|status|logs|connect|reset]
 
-CONTAINER_NAME="cmms-sqlserver"
-SA_PASSWORD="Ali@1234"
+read -p "Enter SQL Server container name [cmms-sqlserver]: " CONTAINER_NAME
+CONTAINER_NAME=${CONTAINER_NAME:-cmms-sqlserver}
+read -s -p "Enter SA password [Ali@1234]: " SA_PASSWORD
+echo
+SA_PASSWORD=${SA_PASSWORD:-Ali@1234}
 
 case "$1" in
     start)

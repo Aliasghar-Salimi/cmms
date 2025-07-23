@@ -38,10 +38,10 @@ public class EnableMfaCommandHandler : IRequestHandler<EnableMfaCommand, Result<
         }
 
         // Find user by phone number
-        var user = await _userManager.FindByNameAsync(request.PhoneNumber);
+        var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
         if (user == null)
         {
-            return Result<bool>.Failure("User not found.");
+            return Result<bool>.Failure("User not found or phone number not confirmed.");
         }
 
         // Check if user is active

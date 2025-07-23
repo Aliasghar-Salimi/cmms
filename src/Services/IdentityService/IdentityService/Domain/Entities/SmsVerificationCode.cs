@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 [Index(nameof(PhoneNumber), nameof(Code), IsUnique = false)]
 [Index(nameof(ExpiresAt))]
+[Index(nameof(MfaToken), IsUnique = true)]
 public class SmsVerificationCode
 {
     public Guid Id { get; set; }
@@ -18,10 +19,12 @@ public class SmsVerificationCode
     public int Attempts { get; set; } = 0;
     public int MaxAttempts { get; set; } = 3;
     public bool IsActive { get; set; } = true;
+    public string? MfaToken { get; set; } // UUID for MFA session identification
     
     public Guid? UserId { get; set; }
     public ApplicationUser? User { get; set; }
     
+    // GUIDANCE: computed properties (get-only)
     public bool IsExpired => DateTime.UtcNow > ExpiresAt;
     public bool CanBeUsed => IsActive && !IsUsed && !IsExpired && Attempts < MaxAttempts;
 } 

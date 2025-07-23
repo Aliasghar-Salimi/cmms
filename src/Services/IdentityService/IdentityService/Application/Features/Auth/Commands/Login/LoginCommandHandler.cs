@@ -72,7 +72,6 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
         if (userMfa != null)
         {
             // MFA is required - send SMS code and return MFA response
-            var mfaToken = Guid.NewGuid().ToString();
             var smsResult = await _smsVerificationService.GenerateAndSendOtpAsync(
                 user.PhoneNumber ?? "",
                 "mfa-login",
@@ -84,25 +83,11 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
                 return Result<MfaLoginResponseDto>.Failure($"Failed to send MFA code: {smsResult.Error}");
             }
 
-            // Create MFA session using the mfaToken as the code
-            var mfaSession = new SmsVerificationCode
-            {
-                PhoneNumber = user.PhoneNumber ?? "",
-                Code = mfaToken, // Use mfaToken as the session identifier
-                Purpose = "mfa-login",
-                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-                UserId = user.Id,
-                IsActive = true
-            };
-
-            _context.SmsVerificationCodes.Add(mfaSession);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            // Return MFA required response
+            // Return MFA required response with OTP code as token
             var mfaResponse = new MfaLoginResponseDto
             {
                 RequiresMfa = true,
-                MfaToken = mfaToken,
+                MfaToken = smsResult.Data, // Use OTP code as MFA token
                 PhoneNumber = MaskPhoneNumber(user.PhoneNumber ?? ""),
                 MfaType = userMfa.MfaType,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5)
@@ -132,7 +117,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
             RequiresMfa = false,
             AccessToken = token,
             RefreshToken = refreshToken.Token,
-            ExpiresAt = DateTime.UtcNow.AddHours(1), // Token expires in 1 hour
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
             User = userDto,
             Roles = roles.ToList(),
             Permissions = permissions

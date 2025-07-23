@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using IdentityService.Application.Common;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace IdentityService.Application.Common.Services;
 
@@ -23,15 +24,15 @@ public class KavenegarSmsService : ISmsService
         _httpClient = httpClient;
         
         _apiKey = _configuration["Kavenegar:ApiKey"] ?? "5734736879526A37446F6656703231373769567158576653476D484D6F68337046727563352B684C52486F3D";
+        
+        _logger.LogInformation("Kavenegar API key loaded: {ApiKeyPrefix}...", _apiKey.Substring(0, Math.Min(10, _apiKey.Length)));
     }
 
-    public async Task<Result<bool>> SendOtpAsync(string phoneNumber, string otp, string template = "otp")
+    public async Task<Result<bool>> SendOtpAsync(string phoneNumber, string otp, string template = "VerifyOTP")
     {
         try
         {
-            var message = $"کد تایید شما: {otp}\n\nCMMS Identity Service\n\nاین کد تا 5 دقیقه معتبر است.";
-            
-            var result = await SendSmsAsync(phoneNumber, message);
+            var result = await SendVerifySmsAsync(phoneNumber, otp, template);
             
             if (result.IsSuccess)
             {
@@ -135,6 +136,103 @@ public class KavenegarSmsService : ISmsService
         }
     }
 
+    private async Task<Result<bool>> SendVerifySmsAsync(string phoneNumber, string otp, string template)
+    {
+        try
+        {
+            // Validate phone number format (Iranian mobile numbers)
+            if (!IsValidIranianPhoneNumber(phoneNumber))
+            {
+                return Result<bool>.Failure("Invalid Iranian phone number format");
+            }
+
+            // Normalize phone number for Kavenegar API
+            var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+            _logger.LogInformation("Sending verify SMS to normalized phone: {NormalizedPhone}", normalizedPhone);
+
+            // Prepare the URL for Kavenegar verify API
+            var url = $"{_baseUrl}/{_apiKey}/verify/lookup.json";
+            
+            // Prepare form data for verify endpoint
+            var formData = new List<KeyValuePair<string, string>>
+            {
+                new("receptor", normalizedPhone),
+                new("token", otp),
+                new("template", template)
+            };
+
+            var content = new FormUrlEncodedContent(formData);
+
+            _logger.LogInformation("Sending verify SMS to Kavenegar API: {Url}", url);
+            _logger.LogInformation("OTP: {Otp}, Template: {Template}", otp, template);
+            _logger.LogInformation("Normalized Phone: {Phone}", normalizedPhone);
+
+            // Send HTTP POST request
+            var response = await _httpClient.PostAsync(url, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            _logger.LogInformation("Kavenegar verify API Response: {StatusCode} - {Content}", response.StatusCode, responseContent);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Parse the response
+                KavenegarResponse? kavenegarResponse = null;
+                try
+                {
+                    kavenegarResponse = JsonSerializer.Deserialize<KavenegarResponse>(responseContent);
+                    _logger.LogInformation("Raw verify response content: {Content}", responseContent);
+                    _logger.LogInformation("Parsed Kavenegar verify response - Return Status: {Status}, Message: {Message}", 
+                        kavenegarResponse?.Return?.Status, kavenegarResponse?.Return?.Message);
+                    
+                    // Check if the response contains "status": 200 in the raw content
+                    if (responseContent.Contains("\"status\": 200"))
+                    {
+                        _logger.LogInformation("Verify SMS sent successfully via Kavenegar (confirmed by raw content)");
+                        return Result<bool>.Success(true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to deserialize Kavenegar verify response: {Content}", responseContent);
+                    return Result<bool>.Failure($"Failed to parse Kavenegar verify response: {ex.Message}");
+                }
+                
+                if (kavenegarResponse?.Return?.Status == 200)
+                {
+                    _logger.LogInformation("Verify SMS sent successfully via Kavenegar");
+                    return Result<bool>.Success(true);
+                }
+                else
+                {
+                    var errorMessage = kavenegarResponse?.Return?.Message ?? "Unknown error";
+                    _logger.LogWarning("Kavenegar verify API returned error: {Error} for phone {PhoneNumber}", errorMessage, phoneNumber);
+                    return Result<bool>.Failure($"Verify SMS sending failed: {errorMessage}");
+                }
+            }
+            else
+            {
+                // Try to parse error response even for non-success status codes
+                try
+                {
+                    var kavenegarResponse = JsonSerializer.Deserialize<KavenegarResponse>(responseContent);
+                    var errorMessage = kavenegarResponse?.Return?.Message ?? $"HTTP {response.StatusCode}";
+                    _logger.LogWarning("Kavenegar verify API returned error: {Error} for phone {PhoneNumber}", errorMessage, phoneNumber);
+                    return Result<bool>.Failure($"Verify SMS sending failed: {errorMessage}");
+                }
+                catch
+                {
+                    _logger.LogWarning("Kavenegar verify API HTTP error: {StatusCode} for phone {PhoneNumber}", response.StatusCode, phoneNumber);
+                    return Result<bool>.Failure($"Verify SMS sending failed with HTTP status: {response.StatusCode}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception occurred while sending verify SMS to {PhoneNumber}", phoneNumber);
+            return Result<bool>.Failure($"Verify SMS sending exception: {ex.Message}");
+        }
+    }
+
     private async Task<Result<bool>> SendSmsAsync(string phoneNumber, string message)
     {
         try
@@ -145,29 +243,59 @@ public class KavenegarSmsService : ISmsService
                 return Result<bool>.Failure("Invalid Iranian phone number format");
             }
 
+            // Normalize phone number for Kavenegar API
+            var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+            _logger.LogInformation("Sending SMS to normalized phone: {NormalizedPhone}", normalizedPhone);
+
             // Prepare the URL for Kavenegar API
             var url = $"{_baseUrl}/{_apiKey}/sms/send.json";
             
             // Prepare form data
             var formData = new List<KeyValuePair<string, string>>
             {
-                new("receptor", phoneNumber),
+                new("receptor", normalizedPhone),
                 new("message", message)
             };
 
             var content = new FormUrlEncodedContent(formData);
 
+            _logger.LogInformation("Sending SMS to Kavenegar API: {Url}", url);
+            _logger.LogInformation("SMS Message: {Message}", message);
+            _logger.LogInformation("Normalized Phone: {Phone}", normalizedPhone);
+
             // Send HTTP POST request
             var response = await _httpClient.PostAsync(url, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
+            _logger.LogInformation("Kavenegar API Response: {StatusCode} - {Content}", response.StatusCode, responseContent);
+
             if (response.IsSuccessStatusCode)
             {
                 // Parse the response
-                var kavenegarResponse = JsonSerializer.Deserialize<KavenegarResponse>(responseContent);
+                KavenegarResponse? kavenegarResponse = null;
+                try
+                {
+                    kavenegarResponse = JsonSerializer.Deserialize<KavenegarResponse>(responseContent);
+                    _logger.LogInformation("Raw response content: {Content}", responseContent);
+                    _logger.LogInformation("Parsed Kavenegar response - Return Status: {Status}, Message: {Message}", 
+                        kavenegarResponse?.Return?.Status, kavenegarResponse?.Return?.Message);
+                    
+                    // Check if the response contains "status": 200 in the raw content
+                    if (responseContent.Contains("\"status\": 200"))
+                    {
+                        _logger.LogInformation("SMS sent successfully via Kavenegar (confirmed by raw content)");
+                        return Result<bool>.Success(true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to deserialize Kavenegar response: {Content}", responseContent);
+                    return Result<bool>.Failure($"Failed to parse Kavenegar response: {ex.Message}");
+                }
                 
                 if (kavenegarResponse?.Return?.Status == 200)
                 {
+                    _logger.LogInformation("SMS sent successfully via Kavenegar");
                     return Result<bool>.Success(true);
                 }
                 else
@@ -179,8 +307,19 @@ public class KavenegarSmsService : ISmsService
             }
             else
             {
-                _logger.LogWarning("Kavenegar API HTTP error: {StatusCode} for phone {PhoneNumber}", response.StatusCode, phoneNumber);
-                return Result<bool>.Failure($"SMS sending failed with HTTP status: {response.StatusCode}");
+                // Try to parse error response even for non-success status codes
+                try
+                {
+                    var kavenegarResponse = JsonSerializer.Deserialize<KavenegarResponse>(responseContent);
+                    var errorMessage = kavenegarResponse?.Return?.Message ?? $"HTTP {response.StatusCode}";
+                    _logger.LogWarning("Kavenegar API returned error: {Error} for phone {PhoneNumber}", errorMessage, phoneNumber);
+                    return Result<bool>.Failure($"SMS sending failed: {errorMessage}");
+                }
+                catch
+                {
+                    _logger.LogWarning("Kavenegar API HTTP error: {StatusCode} for phone {PhoneNumber}", response.StatusCode, phoneNumber);
+                    return Result<bool>.Failure($"SMS sending failed with HTTP status: {response.StatusCode}");
+                }
             }
         }
         catch (Exception ex)
@@ -212,6 +351,33 @@ public class KavenegarSmsService : ISmsService
         return false;
     }
 
+    private string NormalizePhoneNumber(string phoneNumber)
+    {
+        // Remove any non-digit characters
+        var cleanNumber = new string(phoneNumber.Where(char.IsDigit).ToArray());
+        
+        // If it starts with 09, convert to 989 format for Kavenegar
+        if (cleanNumber.Length == 11 && cleanNumber.StartsWith("09"))
+        {
+            return "98" + cleanNumber.Substring(1);
+        }
+        
+        // If it's already in 989 format, return as is
+        if (cleanNumber.Length == 12 && cleanNumber.StartsWith("989"))
+        {
+            return cleanNumber;
+        }
+        
+        // If it's in +989 format, remove the + and return
+        if (cleanNumber.Length == 13 && cleanNumber.StartsWith("989"))
+        {
+            return cleanNumber;
+        }
+        
+        // Default: return the original number
+        return cleanNumber;
+    }
+
     // Kavenegar API response models
     private class KavenegarResponse
     {
@@ -221,7 +387,10 @@ public class KavenegarSmsService : ISmsService
 
     private class KavenegarReturn
     {
+        [JsonPropertyName("status")]
         public int Status { get; set; }
+        
+        [JsonPropertyName("message")]
         public string? Message { get; set; }
     }
 

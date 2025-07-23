@@ -39,10 +39,10 @@ public class MfaLoginCommandHandler : IRequestHandler<MfaLoginCommand, Result<Lo
 
     public async Task<Result<LoginResponseDto>> Handle(MfaLoginCommand request, CancellationToken cancellationToken)
     {
-        // Find the MFA login session by token
+        // Find the MFA login session by MFA token
         var mfaSession = await _context.SmsVerificationCodes
             .Include(svc => svc.User)
-            .FirstOrDefaultAsync(svc => svc.Code == request.MfaToken && 
+            .FirstOrDefaultAsync(svc => svc.MfaToken == request.MfaToken && 
                                        svc.Purpose == "mfa-login" && 
                                        svc.IsActive && 
                                        !svc.IsUsed, cancellationToken);
@@ -60,16 +60,38 @@ public class MfaLoginCommandHandler : IRequestHandler<MfaLoginCommand, Result<Lo
             return Result<LoginResponseDto>.Failure("User account is deactivated.");
         }
 
-        // Verify the MFA code
-        var verificationResult = await _smsVerificationService.VerifyOtpAsync(
-            user.PhoneNumber ?? "",
-            request.VerificationCode,
-            "mfa-login");
-
-        if (!verificationResult.IsSuccess)
+        // Verify the MFA code against the stored code
+        if (mfaSession.Code != request.VerificationCode)
         {
-            return Result<LoginResponseDto>.Failure($"MFA verification failed: {verificationResult.Error}");
+            // Increment attempts
+            mfaSession.Attempts++;
+            await _context.SaveChangesAsync(cancellationToken);
+            
+            return Result<LoginResponseDto>.Failure("Invalid verification code.");
         }
+
+        // Check if code is expired
+        if (mfaSession.IsExpired)
+        {
+            return Result<LoginResponseDto>.Failure("Verification code has expired.");
+        }
+
+        // Check if code is already used
+        if (mfaSession.IsUsed)
+        {
+            return Result<LoginResponseDto>.Failure("Verification code has already been used.");
+        }
+
+        // Check if max attempts exceeded
+        if (mfaSession.Attempts >= mfaSession.MaxAttempts)
+        {
+            return Result<LoginResponseDto>.Failure("Maximum verification attempts exceeded.");
+        }
+
+        // Mark the verification code as used
+        mfaSession.IsUsed = true;
+        mfaSession.UsedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Get user roles
         var roles = await _userManager.GetRolesAsync(user);
@@ -90,7 +112,7 @@ public class MfaLoginCommandHandler : IRequestHandler<MfaLoginCommand, Result<Lo
         {
             AccessToken = token,
             RefreshToken = refreshToken.Token,
-            ExpiresAt = DateTime.UtcNow.AddHours(1), // Token expires in 1 hour
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
             User = userDto,
             Roles = roles.ToList(),
             Permissions = permissions

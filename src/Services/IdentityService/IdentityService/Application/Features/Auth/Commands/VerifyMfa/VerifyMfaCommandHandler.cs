@@ -38,7 +38,7 @@ public class VerifyMfaCommandHandler : IRequestHandler<VerifyMfaCommand, Result<
         }
 
         // Find user by phone number
-        var user = await _userManager.FindByNameAsync(request.PhoneNumber);
+        var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
         if (user == null)
         {
             return Result<bool>.Failure("User not found.");

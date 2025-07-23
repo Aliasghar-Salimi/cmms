@@ -4,6 +4,7 @@ using IdentityService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IdentityService.Migrations
 {
     [DbContext(typeof(IdentityServiceDbContext))]
-    partial class IdentityServiceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250721050812_IncreaseSmsVerificationCodeLength")]
+    partial class IncreaseSmsVerificationCodeLength
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -316,10 +319,6 @@ namespace IdentityService.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(3);
 
-                    b.Property<string>("MfaToken")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -343,10 +342,6 @@ namespace IdentityService.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("MfaToken")
-                        .IsUnique()
-                        .HasFilter("[MfaToken] IS NOT NULL");
 
                     b.HasIndex("UserId");
 

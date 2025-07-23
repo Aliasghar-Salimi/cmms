@@ -14,6 +14,7 @@ using IdentityService.Application.Features.Auth.Commands.MfaLogin;
 using IdentityService.Application.Features.Auth.Queries.GetCurrentUser;
 using IdentityService.Application.Features.Auth.DTOs;
 using IdentityService.Application.Common;
+using IdentityService.Application.Common.Services;
 
 namespace IdentityService.Controllers;
 
@@ -250,29 +251,21 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), 401)]
     public async Task<IActionResult> GetCurrentUser()
     {
-        try
-        {
-            var result = await _mediator.Send(new GetCurrentUserQuery());
-            
-            if (!result.IsSuccess)
-            {
-                return Unauthorized(new { 
-                    error = result.Error,
-                    message = "Authentication failed",
-                    statusCode = 401
-                });
-            }
-
-            return Ok(result.Data);
-        }
-        catch (Exception ex)
+        var result = await _mediator.Send(new GetCurrentUserQuery());
+        
+        if (!result.IsSuccess)
         {
             return Unauthorized(new { 
-                error = "Authentication failed",
-                message = "Invalid or expired token",
-                statusCode = 401,
-                details = ex.Message
+                error = result.Error,
+                message = "Authentication failed",
+                statusCode = 401
             });
         }
+        
+        return Ok(result.Data);
     }
-} 
+
+
+}
+
+ 
