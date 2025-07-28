@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using IdentityService.Domain.Entities;
 using IdentityService.Application.Features.Auth.DTOs;
 using IdentityService.Application.Features.Users.DTOs;
@@ -12,6 +13,7 @@ using IdentityService.Application.Common;
 using IdentityService.Application.Common.Services;
 using IdentityService.Infrastructure.Persistence;
 using AutoMapper;
+using Microsoft.AspNetCore.Http;
 
 namespace IdentityService.Application.Features.Auth.Commands.Login;
 
@@ -22,39 +24,75 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
     private readonly IMapper _mapper;
     private readonly IConfiguration _configuration;
     private readonly ISmsVerificationService _smsVerificationService;
+    private readonly IAuditLogService _auditLogService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public LoginCommandHandler(
         UserManager<ApplicationUser> userManager,
         IdentityServiceDbContext context,
         IMapper mapper,
         IConfiguration configuration,
-        ISmsVerificationService smsVerificationService)
+        ISmsVerificationService smsVerificationService,
+        IAuditLogService auditLogService,
+        IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _context = context;
         _mapper = mapper;
         _configuration = configuration;
         _smsVerificationService = smsVerificationService;
+        _auditLogService = auditLogService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<Result<MfaLoginResponseDto>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        var ipAddress = GetClientIpAddress();
+        var correlationId = _httpContextAccessor.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString();
+        
         // Find user by email
         var user = await _userManager.FindByEmailAsync(request.Email);
         if (user == null)
         {
+            await _auditLogService.LogLoginAsync(
+                Guid.Empty, 
+                request.Email, 
+                request.Email, 
+                ipAddress, 
+                false, 
+                "Invalid email or password", 
+                correlationId);
+            
             return Result<MfaLoginResponseDto>.Failure("Invalid email or password.");
         }
 
         // Check if user is active
         if (!user.IsActive)
         {
+            await _auditLogService.LogLoginAsync(
+                user.Id, 
+                user.UserName ?? "", 
+                user.Email ?? "", 
+                ipAddress, 
+                false, 
+                "User account is deactivated", 
+                correlationId);
+            
             return Result<MfaLoginResponseDto>.Failure("User account is deactivated.");
         }
 
         // Validate tenant if provided
         if (!string.IsNullOrEmpty(request.TenantId) && user.TenantId != Guid.Parse(request.TenantId))
         {
+            await _auditLogService.LogLoginAsync(
+                user.Id, 
+                user.UserName ?? "", 
+                user.Email ?? "", 
+                ipAddress, 
+                false, 
+                "User does not belong to the specified tenant", 
+                correlationId);
+            
             return Result<MfaLoginResponseDto>.Failure("User does not belong to the specified tenant.");
         }
 
@@ -62,6 +100,15 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
         var isPasswordValid = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!isPasswordValid)
         {
+            await _auditLogService.LogLoginAsync(
+                user.Id, 
+                user.UserName ?? "", 
+                user.Email ?? "", 
+                ipAddress, 
+                false, 
+                "Invalid password", 
+                correlationId);
+            
             return Result<MfaLoginResponseDto>.Failure("Invalid email or password.");
         }
 
@@ -93,6 +140,19 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5)
             };
 
+            // Log MFA required
+            await _auditLogService.LogActionAsync(
+                user.Id,
+                user.UserName ?? "",
+                "LOGIN_MFA_REQUIRED",
+                "User",
+                user.Id,
+                ipAddress,
+                null,
+                JsonSerializer.Serialize(new { MfaType = userMfa.MfaType, PhoneNumber = MaskPhoneNumber(user.PhoneNumber ?? "") }),
+                correlationId,
+                JsonSerializer.Serialize(new { Email = user.Email, MfaType = userMfa.MfaType }));
+
             return Result<MfaLoginResponseDto>.Success(mfaResponse);
         }
 
@@ -123,7 +183,31 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<MfaLogin
             Permissions = permissions
         };
 
+        // Log successful login
+        await _auditLogService.LogLoginAsync(
+            user.Id,
+            user.UserName ?? "",
+            user.Email ?? "",
+            ipAddress,
+            true,
+            null,
+            correlationId);
+
         return Result<MfaLoginResponseDto>.Success(response);
+    }
+
+    private string GetClientIpAddress()
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext == null) return "Unknown";
+
+        // Try to get IP from various headers (for proxy/load balancer scenarios)
+        var ip = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
+                 httpContext.Request.Headers["X-Real-IP"].FirstOrDefault() ??
+                 httpContext.Request.Headers["X-Client-IP"].FirstOrDefault() ??
+                 httpContext.Connection.RemoteIpAddress?.ToString();
+
+        return ip ?? "Unknown";
     }
 
     private string MaskPhoneNumber(string phoneNumber)

@@ -2,16 +2,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Set environment variables for better NuGet performance
+# Set environment variables for better NuGet performance and network resilience
 ENV NUGET_XMLDOC_MODE=skip
 ENV DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+ENV DOTNET_NOLOGO=1
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 
-# Copy csproj first for better layer caching
+# Copy NuGet.config first for better caching
+COPY NuGet.config ./
+
+# Copy csproj files for better layer caching
 COPY *.csproj ./
 
-# Restore with retry and timeout settings
-RUN dotnet restore 
+# Restore with retry mechanism
+RUN dotnet restore --verbosity minimal
 
 # Copy everything else
 COPY . ./

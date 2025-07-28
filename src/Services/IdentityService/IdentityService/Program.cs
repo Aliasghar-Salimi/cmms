@@ -15,8 +15,26 @@ using IdentityService.Application.Mapping;
 using IdentityService.Application.Common;
 using IdentityService.Application.Common.Authorization;
 using IdentityService.Application.Common.Services;
+using Serilog;
+using Serilog.Events;
+using Confluent.Kafka;
+using Serilog.Enrichers;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Set up Serilog
+var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+var kafkaTopic = builder.Configuration["Kafka:Topic"] ?? "cmms-identity-service-topic";
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .WriteTo.Console()
+    .WriteTo.Async(sink => sink.Sink(new KafkaAuditLogSink(kafkaTopic, kafkaBootstrapServers)))
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -63,6 +81,9 @@ builder.Services.AddRbacAuthorization();
 // Add Authentication Services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
+// Add Audit Log Service
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // Add SMS Services
 builder.Services.AddScoped<ISmsService, KavenegarSmsService>();
