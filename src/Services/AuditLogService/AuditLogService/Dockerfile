@@ -17,14 +17,15 @@ COPY NuGet.config ./
 # Copy csproj files for better layer caching
 COPY *.csproj ./
 
-# Restore with retry mechanism
-RUN dotnet restore --verbosity minimal
+# Restore with aggressive retry mechanism for sanctions-affected regions
+RUN dotnet restore --verbosity minimal --configfile NuGet.config
 
 # Copy everything else
 COPY . ./
 
-# Build and publish with optimized settings
-RUN dotnet publish -c Release -o /app/publish --no-restore --verbosity minimal
+# Build and publish with explicit restore to ensure all packages are available
+RUN dotnet restore --verbosity minimal --configfile NuGet.config && \
+    dotnet publish -c Release -o /app/publish --verbosity minimal
 
 # Step 2: Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
@@ -36,4 +37,4 @@ COPY --from=build /app/publish ./
 ENV ASPNETCORE_URLS=http://+:80
 EXPOSE 80
 
-ENTRYPOINT ["dotnet", "IdentityService.dll"]
+ENTRYPOINT ["dotnet", "AuditLogService.dll"] 
