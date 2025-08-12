@@ -5,19 +5,23 @@ ENV NUGET_XMLDOC_MODE=skip
 ENV DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 
-COPY NuGet.config ./
+# Copy project file and restore dependencies
 COPY *.csproj ./
 RUN dotnet restore --verbosity detailed
 
-
+# Copy everything else and build
 COPY . ./
 RUN dotnet build -c Release -o /app/build
 
-RUN dotnet publish -c Release -o /app/publish --no-restore --verbosity detailed
+# Publish the application
+RUN dotnet publish -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish ./
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 ENV ASPNETCORE_URLS=http://+:80
 EXPOSE 80

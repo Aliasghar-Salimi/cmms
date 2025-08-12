@@ -1,14 +1,14 @@
  # CMMS Microservices Platform
 
-A comprehensive microservices platform for Computerized Maintenance Management System (CMMS) with event-driven architecture using Kafka.
+A comprehensive microservices platform for Computerized Maintenance Management System (CMMS) with event-driven architecture using Kafka, featuring API composition and distributed transaction management with the Saga pattern.
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Identity      │    │   Audit Log     │    │  Infrastructure │
-│   Service       │    │   Service       │    │  Services       │
-│   (Port 5000)   │    │   (Port 5001)   │    │                 │
+│   Identity      │    │   Asset         │    │   Audit Log     │
+│   Service       │    │   Service       │    │   Service       │
+│   (Port 5000)   │    │   (Port 5002)   │    │   (Port 5001)   │
 └─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
           │                      │                      │
           │                      │                      │
@@ -52,6 +52,7 @@ docker-compose down
 | Service | Port | Description | Health Check |
 |---------|------|-------------|--------------|
 | **Identity Service** | 5000 | User authentication, authorization, and management | `http://localhost:5000/health` |
+| **Asset Service** | 5002 | Asset lifecycle management with Saga pattern | `http://localhost:5002/health` |
 | **Audit Log Service** | 5001 | Audit log collection and querying | `http://localhost:5001/health` |
 
 ### Infrastructure Services
@@ -82,6 +83,18 @@ Kafka__Topic: cmms-identity-service-topic
 Kafka__AuditTopic: cmms-audit-logs
 ```
 
+#### Asset Service
+```yaml
+ASPNETCORE_ENVIRONMENT: Development
+ConnectionStrings__DefaultConnection: Server=sqlserver;Database=CMMSAssetService;User=sa;Password=Ali@1234;TrustServerCertificate=True
+Kafka__BootstrapServers: kafka:29092
+Kafka__AuditTopic: cmms-audit-logs
+IdentityService__BaseUrl: http://identity-service:5000
+IdentityService__TimeoutSeconds: 30
+IdentityService__MaxRetries: 3
+IdentityService__RetryDelayMilliseconds: 1000
+```
+
 #### Audit Log Service
 ```yaml
 ASPNETCORE_ENVIRONMENT: Development
@@ -89,6 +102,51 @@ ConnectionStrings__DefaultConnection: Server=sqlserver;Database=CMMSAuditLogServ
 Kafka__BootstrapServers: kafka:29092
 Kafka__AuditTopic: cmms-audit-logs
 ```
+
+## 🆕 New Features
+
+### API Composition
+The Asset Service implements API composition to integrate with the Identity Service for user authentication and permission validation. This allows the Asset Service to:
+
+- **Validate user permissions** before performing asset operations
+- **Retrieve user context** for audit logging and authorization
+- **Maintain service independence** while providing seamless user experience
+- **Handle cross-service communication** through HTTP clients with retry policies
+
+### Saga Pattern for Distributed Transactions
+The Asset Service implements the Saga pattern to manage complex, multi-step operations that span multiple services and ensure data consistency:
+
+#### Saga Orchestrator
+- **Centralized coordination** of distributed transactions
+- **Step-by-step execution** with rollback capabilities
+- **Compensation logic** for handling failures
+- **State persistence** for transaction recovery
+
+#### Supported Saga Types
+1. **Asset Creation Saga**
+   - Permission validation
+   - Asset creation
+   - Event publishing
+   - Compensation: Asset deletion on failure
+
+2. **Asset Update Saga**
+   - Permission validation
+   - Asset update
+   - Event publishing
+   - Compensation: Asset rollback on failure
+
+3. **Asset Deletion Saga**
+   - Permission validation
+   - Asset deletion
+   - Event publishing
+   - Compensation: Asset restoration on failure
+
+#### Saga States
+- **Pending**: Initial state when saga starts
+- **InProgress**: Saga is executing steps
+- **Completed**: All steps completed successfully
+- **Failed**: Saga failed, compensation executed
+- **Compensated**: Rollback completed
 
 ## 📊 API Endpoints
 
@@ -122,6 +180,27 @@ Kafka__AuditTopic: cmms-audit-logs
 - `PUT /api/v1/permissions/{id}` - Update permission
 - `DELETE /api/v1/permissions/{id}` - Delete permission
 
+### Asset Service (`http://localhost:5002`)
+
+#### Asset Management
+- `GET /api/v1/assets` - List assets with filtering and pagination
+- `POST /api/v1/assets` - Create asset (triggers Asset Creation Saga)
+- `GET /api/v1/assets/{id}` - Get asset by ID
+- `PUT /api/v1/assets/{id}` - Update asset (triggers Asset Update Saga)
+- `DELETE /api/v1/assets/{id}` - Delete asset (triggers Asset Deletion Saga)
+
+#### Saga Management
+- `GET /api/v1/sagas/{id}` - Get saga status and details
+- `POST /api/v1/sagas/{id}/compensate` - Manually trigger saga compensation
+
+#### Query Parameters for Assets
+- `page` - Page number (default: 1)
+- `pageSize` - Items per page (default: 20)
+- `assetType` - Filter by asset type
+- `manufacturer` - Filter by manufacturer
+- `status` - Filter by asset status
+- `location` - Filter by location
+
 ### Audit Log Service (`http://localhost:5001`)
 
 #### Audit Logs
@@ -132,7 +211,7 @@ Kafka__AuditTopic: cmms-audit-logs
 #### Query Parameters
 - `page` - Page number (default: 1)
 - `pageSize` - Items per page (default: 20)
-- `action` - Filter by action (e.g., "LOGIN", "LOGOUT")
+- `action` - Filter by action (e.g., "LOGIN", "LOGOUT", "ASSET_CREATED")
 - `userName` - Filter by username
 - `fromDate` - Filter from date (ISO format)
 - `toDate` - Filter to date (ISO format)
@@ -143,6 +222,7 @@ Kafka__AuditTopic: cmms-audit-logs
 ```bash
 # Check all services health
 curl http://localhost:5000/health  # Identity Service
+curl http://localhost:5002/health  # Asset Service
 curl http://localhost:5001/health  # Audit Log Service
 ```
 
@@ -154,8 +234,8 @@ docker exec cmms-kafka kafka-topics --bootstrap-server localhost:9092 --list
 # Monitor audit logs topic
 docker exec cmms-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cmms-audit-logs --from-beginning
 
-# Monitor identity service logs
-docker exec cmms-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cmms-identity-service-topic --from-beginning
+# Monitor asset events topic
+docker exec cmms-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cmms-asset-events --from-beginning
 ```
 
 ### Database Access
@@ -174,6 +254,7 @@ docker-compose logs
 
 # View specific service logs
 docker-compose logs identity-service
+docker-compose logs asset-service
 docker-compose logs auditlog-service
 docker-compose logs kafka
 ```
@@ -199,14 +280,28 @@ docker-compose logs kafka
      -d '{"email":"admin@cmms.com","password":"Admin@123"}'
    ```
 
-4. **Check audit logs:**
+4. **Create an asset (triggers saga):**
+   ```bash
+   curl -X POST http://localhost:5002/api/v1/assets \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -d '{"name":"Test Asset","assetType":"Equipment","manufacturer":"Test Corp","location":"Warehouse A","status":"Active"}'
+   ```
+
+5. **Check asset creation:**
+   ```bash
+   curl http://localhost:5002/api/v1/assets
+   ```
+
+6. **Check audit logs:**
    ```bash
    curl http://localhost:5001/api/auditlogs
    ```
 
-5. **Monitor Kafka messages:**
+7. **Monitor Kafka messages:**
    ```bash
    docker exec cmms-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cmms-audit-logs --from-beginning
+   docker exec cmms-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cmms-asset-events --from-beginning
    ```
 
 ### Automated Testing Script
@@ -227,6 +322,9 @@ docker-compose up -d zookeeper kafka sqlserver
 cd src/Services/IdentityService/IdentityService
 dotnet run
 
+cd src/Services/AssetService/AssetService
+dotnet run
+
 cd src/Services/AuditLogService/AuditLogService
 dotnet run
 ```
@@ -240,6 +338,11 @@ dotnet run
 ```bash
 # Identity Service migrations
 cd src/Services/IdentityService/IdentityService
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+
+# Asset Service migrations
+cd src/Services/AssetService/AssetService
 dotnet ef migrations add InitialCreate
 dotnet ef database update
 
@@ -269,6 +372,11 @@ dotnet ef database update
 4. **Port conflicts:**
    - Check if ports are already in use: `netstat -tulpn | grep :5000`
    - Modify ports in docker-compose.yml if needed
+
+5. **Saga failures:**
+   - Check saga state in database: `SELECT * FROM SagaStates WHERE Status = 'Failed'`
+   - Review compensation logic and retry mechanisms
+   - Check cross-service communication logs
 
 ### Clean Start
 ```bash

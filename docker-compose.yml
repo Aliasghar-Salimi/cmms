@@ -25,6 +25,11 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: cmms-kafka
+    deploy:
+      resources:
+        limits:
+          memory: "1G"
+          cpus: "1.0"
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -34,6 +39,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -54,11 +60,17 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    
 
   # ELK Stack Services
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: cmms-elasticsearch
+    deploy:
+      resources:
+        limits:
+          memory: "1G"
+          cpus: "1.0"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -80,6 +92,11 @@ services:
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.0
     container_name: cmms-logstash
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
     ports:
       - "5044:5044"
       - "9600:9600"
@@ -105,6 +122,11 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: cmms-kibana
+    deploy:
+      resources:
+        limits:
+          memory: "2G"
+          cpus: "1.0"
     ports:
       - "5601:5601"
     environment:
@@ -124,10 +146,17 @@ services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: cmms-sqlserver
+    deploy:
+      resources:
+        limits:
+          memory: "2G"
+          cpus: "1.0"
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=Ali@1234
       - MSSQL_PID=Developer
+      - MSSQL_MEMORY_LIMIT_MB=1536
+      - MSSQL_AGENT_ENABLED=false
     ports:
       - "1433:1433"
     volumes:
@@ -148,6 +177,11 @@ services:
       dockerfile: Dockerfile
     image: cmms-identity-service:latest
     container_name: cmms-identity-service
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
     ports:
       - "5000:80"
     environment:
@@ -186,10 +220,17 @@ services:
       dockerfile: Dockerfile
     image: cmms-auditlog-service:latest
     container_name: cmms-auditlog-service
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
     ports:
       - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_HTTP_PORTS=
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=CMMSAuditLogService;User=sa;Password=Ali@1234;TrustServerCertificate=True
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__AuditTopic=cmms-audit-logs
@@ -216,10 +257,81 @@ services:
         dotnet AuditLogService.dll
       "
 
+  # AssetService
+  asset-service:
+    build:
+      context: ./src/Services/AssetService/AssetService
+      dockerfile: Dockerfile
+    image: cmms-asset-service:latest
+    container_name: cmms-asset-service
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
+    ports:
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=CMMSAssetService;User=sa;Password=Ali@1234;TrustServerCertificate=True
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__AuditTopic=cmms-audit-logs
+      - Kafka__DefaultTopic=cmms-asset-events
+      - IdentityService__BaseUrl=http://identity-service:5000
+      - IdentityService__TimeoutSeconds=30
+      - IdentityService__MaxRetries=3
+      - IdentityService__RetryDelayMilliseconds=1000
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+    networks:
+      - cmms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: >
+      sh -c "
+        echo 'Checking if SQL Server is healthy...' &&
+        until curl -sf sqlserver:1433 > /dev/null; do
+          echo 'Waiting for SQL Server...';
+          sleep 2;
+        done &&
+        echo 'SQL Server is healthy.' &&
+
+        echo 'Checking if Kafka is healthy...' &&
+        until curl -sf kafka:9092 > /dev/null; do
+          echo 'Waiting for Kafka...';
+          sleep 2;
+        done &&
+        echo 'Kafka is healthy.' &&
+
+        echo 'Checking if Identity Service is healthy...' &&
+        until curl -sf http://identity-service:5000/health > /dev/null; do
+          echo 'Waiting for Identity Service...';
+          sleep 2;
+        done &&
+        echo 'Identity Service is healthy.' &&
+
+        dotnet AssetService.dll
+      "
+
   # Optional: Kafka UI for monitoring
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: cmms-kafka-ui
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
     ports:
       - "8080:8080"
     environment:
@@ -237,6 +349,11 @@ services:
   adminer:
     image: adminer:latest
     container_name: cmms-adminer
+    deploy:
+      resources:
+        limits:
+          memory: "512M"
+          cpus: "0.5"
     ports:
       - "8081:8080"
     environment:

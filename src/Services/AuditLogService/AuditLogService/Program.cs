@@ -14,6 +14,7 @@ builder.Services.AddDbContext<AuditLogServiceDbContext>(options =>
 
 // Add Kafka consumer services - Changed to Singleton to fix DI issue
 builder.Services.AddSingleton<IKafkaConsumerService, KafkaConsumerService>();
+builder.Services.AddSingleton<IElasticsearchPublisherService, ElasticsearchPublisherService>();
 builder.Services.AddHostedService<KafkaConsumerBackgroundService>();
 
 // Add services to the container.
@@ -29,6 +30,10 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.File("logs/audit-log.log", rollingInterval: RollingInterval.Day));
 
 var app = builder.Build();
+
+// Configure Kestrel to bind to all interfaces
+app.Urls.Clear();
+app.Urls.Add("http://0.0.0.0:80");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -18,7 +18,7 @@ COPY NuGet.config ./
 COPY *.csproj ./
 
 # Restore with aggressive retry mechanism for sanctions-affected regions
-RUN dotnet restore --verbosity minimal --configfile NuGet.config
+RUN dotnet restore --verbosity detailed --configfile NuGet.config
 
 # Copy everything else
 COPY . ./
@@ -32,6 +32,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/publish ./
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Configure environment
 ENV ASPNETCORE_URLS=http://+:80

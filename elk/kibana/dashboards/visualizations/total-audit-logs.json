@@ -1,0 +1,31 @@
+{
+  "version": "8.5.0",
+  "objects": [
+    {
+      "id": "total-audit-logs",
+      "type": "visualization",
+      "attributes": {
+        "title": "Total Audit Logs",
+        "visState": "{\"title\":\"Total Audit Logs\",\"type\":\"metric\",\"params\":{\"addTooltip\":true,\"addLegend\":false,\"type\":\"metric\",\"metric\":{\"percentageMode\":false,\"useRanges\":false,\"colorSchema\":\"Green to Red\",\"metricColorMode\":\"None\",\"colorsRange\":[{\"type\":\"range\",\"from\":0,\"to\":100}],\"labels\":{\"show\":true},\"invertColors\":false,\"style\":{\"bgFill\":\"#000\",\"bgColor\":false,\"labelColor\":false,\"subText\":\"\",\"fontSize\":60}}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{}}]}",
+        "uiStateJSON": "{}",
+        "description": "Total count of audit logs",
+        "savedSearchRefName": "audit-logs-search",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"highlightAll\":true,\"version\":true,\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
+        }
+      },
+      "references": [
+        {
+          "type": "index-pattern",
+          "id": "cmms-audit-logs-*",
+          "name": "kibanaSavedObjectMeta.searchSourceJSON.index"
+        }
+      ],
+      "migrationVersion": {
+        "visualization": "8.5.0"
+      },
+      "coreMigrationVersion": "8.5.0"
+    }
+  ]
+} 

@@ -14,15 +14,18 @@ public class KafkaConsumerService : IKafkaConsumerService, IDisposable
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<KafkaConsumerService> _logger;
     private readonly string _topic;
+    private readonly IElasticsearchPublisherService _elasticsearchPublisher;
     private bool _isConsuming = false;
 
     public KafkaConsumerService(
         IConfiguration configuration,
         IServiceScopeFactory serviceScopeFactory,
-        ILogger<KafkaConsumerService> logger)
+        ILogger<KafkaConsumerService> logger,
+        IElasticsearchPublisherService elasticsearchPublisher)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _elasticsearchPublisher = elasticsearchPublisher;
         _topic = configuration["Kafka:AuditTopic"] ?? "cmms-audit-logs";
 
         var bootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
@@ -130,7 +133,10 @@ public class KafkaConsumerService : IKafkaConsumerService, IDisposable
             dbContext.AuditLogs.Add(auditLog);
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Audit log saved to database: {Action} by {UserName} at {Timestamp}", 
+            // Also publish to Elasticsearch for real-time visualization
+            await _elasticsearchPublisher.PublishToElasticsearchAsync(auditLog, cancellationToken);
+
+            _logger.LogInformation("Audit log saved to database and published to Elasticsearch: {Action} by {UserName} at {Timestamp}", 
                 auditLog.Action, auditLog.UserName, auditLog.Timestamp);
         }
         catch (JsonException ex)
